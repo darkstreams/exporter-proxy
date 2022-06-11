@@ -1,0 +1,13 @@
+## Quick dev
+
+GET http://localhost:6543/metrics
+
+### 200
+GET http://localhost:6543/
+
+### 404
+GET http://localhost:6543/foobar
+
+### app_names
+GET http://localhost:6543/apps
+

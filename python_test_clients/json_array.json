@@ -1,0 +1,8 @@
+{
+    "foo_bar_app1_metrics": [
+        "# HELP http_requests_total_foo_bar_app1 The total number of HTTP requests.",
+        "# TYPE http_requests_total_foo_bar_app1 counter",
+        "http_requests_total_foo_bar_app1{method=\"post\",code=\"200\"} 1027 1395066363000",
+        "http_requests_total_foo_bar_app1{method=\"post\",code=\"400\"}    3 1395066363000"
+    ]
+}
