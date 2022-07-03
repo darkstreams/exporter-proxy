@@ -13,23 +13,23 @@ pub async fn poll_external(
     client_timeout: u64,
     accept_invalid_cert: bool,
 ) {
+    let client = match reqwest::Client::builder()
+        .timeout(tokio::time::Duration::from_secs(client_timeout))
+        .danger_accept_invalid_certs(accept_invalid_cert)
+        .build()
+    {
+        Ok(client) => client,
+        Err(err) => {
+            panic!(
+                "cannot initialize the http client to poll endpoints, err: {}",
+                err
+            )
+        }
+    };
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(poll_interval)).await;
 
         let mut gather_futures = Vec::new();
-        let client = match reqwest::Client::builder()
-            .timeout(tokio::time::Duration::from_secs(client_timeout))
-            .danger_accept_invalid_certs(accept_invalid_cert)
-            .build()
-        {
-            Ok(client) => client,
-            Err(err) => {
-                panic!(
-                    "cannot initialize the http client to poll endpoints, err: {}",
-                    err
-                )
-            }
-        };
 
         for endpoint in endpoints.iter() {
             let resp = tokio::spawn(client.get(endpoint.to_owned()).send());
@@ -69,7 +69,11 @@ pub async fn poll_external(
                 }
             };
             let data = match resp.bytes().await {
-                Ok(data) => data,
+                Ok(data) => {
+                    let mut body = data.to_vec();
+                    body.push(b'\n'); // Add a newline regardless
+                    body
+                }
                 Err(err) => {
                     error!(
                         "error reading response, discarding this request. Error: {}",

@@ -1,5 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 
+use crate::inbound::acquire_permit;
+
 use super::GlobalMetrics;
 use anyhow::{anyhow, Context, Result};
 use capnp_futures;
@@ -10,6 +12,7 @@ use parking_lot::RwLock;
 use tokio::{
     io::{AsyncReadExt, BufStream},
     net::{TcpListener, UnixListener},
+    sync::Semaphore,
 };
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::{debug, error, info, trace};
@@ -53,19 +56,33 @@ pub async fn create_tcp_listener(addr: SocketAddr) -> Result<TcpListener> {
 }
 
 /// handles requests from unix socket that are supposed to be in capnp format.
-pub async fn run_unix_socket_listener_capnp(
+pub async fn run_unix_listener_capnp(
     listener: UnixListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
     sourceaddr: String,
+    ratelimit: Arc<Semaphore>,
 ) {
     loop {
-        if let Ok((stream, _)) = listener.accept().await {
-            debug!("Received unix socket connection");
-            tokio::task::spawn(handle_client_capnp(
-                stream.compat(),
-                metrics.clone(),
-                sourceaddr.to_owned(),
-            ));
+        let permit = acquire_permit(&ratelimit).await;
+        debug!("acquired semaphore, {:?}", permit);
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                debug!("Received unix socket connection for capnp handler");
+                let metrics_clone = metrics.clone();
+                let sourceaddr_clone = sourceaddr.clone();
+                tokio::task::spawn(async move {
+                    handle_client_capnp(stream.compat(), metrics_clone, sourceaddr_clone).await;
+                    drop(permit);
+                });
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on unix socket capnp handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+                drop(permit);
+            }
         }
     }
 }
@@ -129,20 +146,33 @@ pub async fn handle_client_capnp<
     }
 }
 
-pub async fn run_listener_json(
+pub async fn run_unix_listener_json(
     listener: UnixListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
-    source: String,
+    sourceaddr: String,
+    ratelimit: Arc<Semaphore>,
 ) {
-    debug!("listening for json");
     loop {
-        if let Ok((stream, _)) = listener.accept().await {
-            debug!("Received unix socket connection");
-            tokio::task::spawn(handle_client_json(
-                stream,
-                metrics.clone(),
-                source.to_owned(),
-            ));
+        let permit = acquire_permit(&ratelimit).await;
+        debug!("acquired semaphore, {:?}", permit);
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                debug!("Received unix socket connection for json handler");
+                let metrics_clone = metrics.clone();
+                let sourceaddr_clone = sourceaddr.clone();
+                tokio::task::spawn(async move {
+                    handle_client_json(stream, metrics_clone, sourceaddr_clone).await;
+                    drop(permit);
+                });
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on unix socket json handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+                drop(permit);
+            }
         }
     }
 }
@@ -213,15 +243,32 @@ pub async fn run_tcp_listener_capnp(
     listener: TcpListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
     sourceaddr: SocketAddr,
+    ratelimit: Arc<Semaphore>,
 ) {
     loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            debug!("Received TCP socket connection from {}", addr);
-            tokio::task::spawn(handle_client_capnp(
-                stream.compat(),
-                metrics.clone(),
-                sourceaddr.to_string(),
-            ));
+        let permit = acquire_permit(&ratelimit).await;
+        debug!("acquired semaphore, {:?}", permit);
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                debug!(
+                    "Received tcp socket connection for capnp handler from {}",
+                    addr
+                );
+                let metrics_clone = metrics.clone();
+                tokio::task::spawn(async move {
+                    handle_client_capnp(stream.compat(), metrics_clone, sourceaddr.to_string())
+                        .await;
+                    drop(permit);
+                });
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on tcp socket capnp handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+                drop(permit);
+            }
         }
     }
 }
@@ -230,15 +277,31 @@ pub async fn run_tcp_listener_json(
     listener: TcpListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
     sourceaddr: SocketAddr,
+    ratelimit: Arc<Semaphore>,
 ) {
     loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            debug!("Received TCP socket connection from {}", addr);
-            tokio::task::spawn(handle_client_json(
-                stream,
-                metrics.clone(),
-                sourceaddr.to_string(),
-            ));
+        let permit = acquire_permit(&ratelimit).await;
+        debug!("acquired semaphore, {:?}", permit);
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                debug!(
+                    "Received tco socket connection for json handler from {}",
+                    addr
+                );
+                let metrics_clone = metrics.clone();
+                tokio::task::spawn(async move {
+                    handle_client_json(stream, metrics_clone, sourceaddr.to_string()).await;
+                    drop(permit);
+                });
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on tcp socket json handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+                drop(permit);
+            }
         }
     }
 }

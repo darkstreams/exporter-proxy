@@ -6,7 +6,19 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use prettytable::{cell, row, Table};
 use serde::Deserialize;
+use tokio::sync::Semaphore;
 use tracing::debug;
+
+/// acquire permit
+pub async fn acquire_permit(ratelimit: &Arc<Semaphore>) -> tokio::sync::OwnedSemaphorePermit {
+    let permit = match ratelimit.clone().acquire_owned().await {
+        Ok(permit) => permit,
+        Err(err) => {
+            panic!("error acquiring semaphore. This is a bug and shouldn't happen, as we're not dropping the semaphore. Raise an issue. Error: {}", err);
+        }
+    };
+    permit
+}
 
 /// store metrics with the received epoch timestamp
 #[derive(Debug, Deserialize)]

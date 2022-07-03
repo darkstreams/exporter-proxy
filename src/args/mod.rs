@@ -71,6 +71,7 @@ pub struct PollExternal {
 #[derive(Debug, Deserialize)]
 pub struct Exporter {
     pub worker_threads: usize,
+    pub concurrent_requests: u16,
     pub scrape_expose_endpoint: SocketAddr,
 }
 
