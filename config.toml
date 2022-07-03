@@ -17,7 +17,7 @@ receive_on_tcp_socket = true
 receiver_tcp_socket = "127.0.0.1:6554"
 [poll_external]
 poll_other_scrape_endpoints = true
-other_scrape_endpoints = ["http://127.0.0.1:1025/1025.html", "http://127.0.0.1:1026/1026.html", "http://127.0.0.1:1027/"]
+other_scrape_endpoints = ["http://127.0.0.1:1025/1025.html", "http://127.0.0.1:1026/1026.html", "http://127.0.0.1:1027/1027.html"]
 allow_invalid_certs = true
 poll_interval = 5 # in seconds
 client_timeout = 2 # in seconds
