@@ -53,19 +53,28 @@ pub async fn create_tcp_listener(addr: SocketAddr) -> Result<TcpListener> {
 }
 
 /// handles requests from unix socket that are supposed to be in capnp format.
-pub async fn run_unix_socket_listener_capnp(
+pub async fn run_unix_listener_capnp(
     listener: UnixListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
     sourceaddr: String,
 ) {
     loop {
-        if let Ok((stream, _)) = listener.accept().await {
-            debug!("Received unix socket connection");
-            tokio::task::spawn(handle_client_capnp(
-                stream.compat(),
-                metrics.clone(),
-                sourceaddr.to_owned(),
-            ));
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                debug!("Received unix socket connection for capnp handler");
+                tokio::task::spawn(handle_client_capnp(
+                    stream.compat(),
+                    metrics.clone(),
+                    sourceaddr.to_owned(),
+                ));
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on unix socket capnp handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+            }
         }
     }
 }
@@ -129,20 +138,28 @@ pub async fn handle_client_capnp<
     }
 }
 
-pub async fn run_listener_json(
+pub async fn run_unix_listener_json(
     listener: UnixListener,
     metrics: Arc<RwLock<GlobalMetrics>>,
     source: String,
 ) {
-    debug!("listening for json");
     loop {
-        if let Ok((stream, _)) = listener.accept().await {
-            debug!("Received unix socket connection");
-            tokio::task::spawn(handle_client_json(
-                stream,
-                metrics.clone(),
-                source.to_owned(),
-            ));
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                debug!("Received unix socket connection for json handler");
+                tokio::task::spawn(handle_client_json(
+                    stream,
+                    metrics.clone(),
+                    source.to_owned(),
+                ));
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on unix socket json handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+            }
         }
     }
 }
@@ -215,13 +232,25 @@ pub async fn run_tcp_listener_capnp(
     sourceaddr: SocketAddr,
 ) {
     loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            debug!("Received TCP socket connection from {}", addr);
-            tokio::task::spawn(handle_client_capnp(
-                stream.compat(),
-                metrics.clone(),
-                sourceaddr.to_string(),
-            ));
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                debug!(
+                    "Received tcp socket connection for capnp handler from {}",
+                    addr
+                );
+                tokio::task::spawn(handle_client_capnp(
+                    stream.compat(),
+                    metrics.clone(),
+                    sourceaddr.to_string(),
+                ));
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on tcp socket capnp handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+            }
         }
     }
 }
@@ -232,13 +261,25 @@ pub async fn run_tcp_listener_json(
     sourceaddr: SocketAddr,
 ) {
     loop {
-        if let Ok((stream, addr)) = listener.accept().await {
-            debug!("Received TCP socket connection from {}", addr);
-            tokio::task::spawn(handle_client_json(
-                stream,
-                metrics.clone(),
-                sourceaddr.to_string(),
-            ));
+        match listener.accept().await {
+            Ok((stream, addr)) => {
+                debug!(
+                    "Received tco socket connection for json handler from {}",
+                    addr
+                );
+                tokio::task::spawn(handle_client_json(
+                    stream,
+                    metrics.clone(),
+                    sourceaddr.to_string(),
+                ));
+            }
+            Err(err) => {
+                error!(
+                    "error accepting on tcp socket json handler, yielding task. err: {}",
+                    err
+                );
+                tokio::task::yield_now().await;
+            }
         }
     }
 }

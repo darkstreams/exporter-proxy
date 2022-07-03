@@ -14,8 +14,8 @@ use crate::{
     args::Format::{CapnP, Json},
     inbound::{
         socket::{
-            create_tcp_listener, create_unix_listener, run_listener_json, run_tcp_listener_capnp,
-            run_tcp_listener_json, run_unix_socket_listener_capnp,
+            create_tcp_listener, create_unix_listener, run_tcp_listener_capnp,
+            run_tcp_listener_json, run_unix_listener_json, run_unix_listener_capnp,
         },
         GlobalMetrics,
     },
@@ -73,14 +73,14 @@ fn main() -> Result<()> {
         )?;
         match config.receiver.format {
             CapnP => {
-                rt.spawn(run_unix_socket_listener_capnp(
+                rt.spawn(run_unix_listener_capnp(
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_unix_socket,
                 ));
             }
             Json => {
-                rt.spawn(run_listener_json(
+                rt.spawn(run_unix_listener_json(
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_unix_socket,
