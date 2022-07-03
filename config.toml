@@ -1,6 +1,11 @@
 [exporter]
 # 0 for running this in current thread, > 1 to use a threadpool. (this can be verified with ps -eTwww -p <pid of exporter proxy>)
 worker_threads = 0
+# concurrent connections to each handler. This limit will be applied for each receiving handler (unix and tcp) via semaphores.
+# Make sure the ulimit has enough openfile limit to handle the number of concurrent requests. Max allowed value is 65534
+# This limit is not applied for poll_external, as it is rare to hit a threshold limit and the limit can be controlled
+# by restricting the number of endpoints in `other_scrape_endpoints` under the poll_external section.
+concurrent_requests = 2048
 # The endpoint where prometheus can scrape the collective metrics.
 scrape_expose_endpoint = "0.0.0.0:6555"
 [receiver]
@@ -16,7 +21,7 @@ unix_socket_group = "current_group"
 receive_on_tcp_socket = true
 receiver_tcp_socket = "127.0.0.1:6554"
 [poll_external]
-poll_other_scrape_endpoints = true
+poll_other_scrape_endpoints = false
 other_scrape_endpoints = ["http://127.0.0.1:1025/1025.html", "http://127.0.0.1:1026/1026.html", "http://127.0.0.1:1027/1027.html"]
 allow_invalid_certs = true
 poll_interval = 5 # in seconds

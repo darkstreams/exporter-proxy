@@ -4,10 +4,12 @@ mod poll_external;
 mod schema;
 mod scrape;
 
+use std::sync::Arc;
+
 use args::{Args, Config};
 
 use anyhow::{Context, Result};
-use tokio::runtime;
+use tokio::{runtime, sync::Semaphore};
 use tracing::{debug, info};
 
 use crate::{
@@ -15,7 +17,7 @@ use crate::{
     inbound::{
         socket::{
             create_tcp_listener, create_unix_listener, run_tcp_listener_capnp,
-            run_tcp_listener_json, run_unix_listener_json, run_unix_listener_capnp,
+            run_tcp_listener_json, run_unix_listener_capnp, run_unix_listener_json,
         },
         GlobalMetrics,
     },
@@ -71,12 +73,15 @@ fn main() -> Result<()> {
             &config.receiver.unix_socket_user,
             &config.receiver.unix_socket_group,
         )?;
+        let unix_limit = Arc::new(Semaphore::new(config.exporter.concurrent_requests.into()));
+
         match config.receiver.format {
             CapnP => {
                 rt.spawn(run_unix_listener_capnp(
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_unix_socket,
+                    unix_limit,
                 ));
             }
             Json => {
@@ -84,6 +89,7 @@ fn main() -> Result<()> {
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_unix_socket,
+                    unix_limit,
                 ));
             }
         }
@@ -92,6 +98,7 @@ fn main() -> Result<()> {
     // start listening on TCP socket if enabled
     if config.receiver.receive_on_tcp_socket {
         let socket = rt.block_on(create_tcp_listener(config.receiver.receiver_tcp_socket))?;
+        let tcp_limit = Arc::new(Semaphore::new(config.exporter.concurrent_requests.into()));
 
         match config.receiver.format {
             CapnP => {
@@ -99,6 +106,7 @@ fn main() -> Result<()> {
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_tcp_socket,
+                    tcp_limit,
                 ));
             }
             Json => {
@@ -106,6 +114,7 @@ fn main() -> Result<()> {
                     socket,
                     global_metrics.clone(),
                     config.receiver.receiver_tcp_socket,
+                    tcp_limit,
                 ));
             }
         }

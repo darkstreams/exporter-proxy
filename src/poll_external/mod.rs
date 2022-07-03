@@ -73,7 +73,7 @@ pub async fn poll_external(
                     let mut body = data.to_vec();
                     body.push(b'\n'); // Add a newline regardless
                     body
-                },
+                }
                 Err(err) => {
                     error!(
                         "error reading response, discarding this request. Error: {}",
