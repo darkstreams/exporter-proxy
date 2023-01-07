@@ -4,11 +4,11 @@ This is a dumb lightweight asynchronous exporter proxy that will help to expose 
 
 Exporter proxy is capable of receiving and polling.
  
-Exporter proxy receives data either as capnp or as json. It will not accept both of them at the same time. Check the `receiver.format` section in the config.toml to choose one.
+Exporter proxy receives data in capnp and/or json. It will accept both serialization format if enabled. Check the `config.toml` for more details.
 
 If multiple applications send metrics to the exporter proxy, it is the application's responsibility to add a prefix to the metric name to prevent collission. If there is a duplicate occurrence of same metric name from two different applications, the exporter proxy will expose both occurrences. 
 
-Both the TCP and the Unix socket receiver endpoints expects the data to be in a key-value form. The capnp schema is also a basic kv structure where the key is the name of the application that is sending the metrics and the value, a string representation of metrics. If the format is chosen as json, it could be either a single multiline string representation of the entire metrics, or a json array strings. This is just a way for the exporter proxy to distinguish between the metrices send by different application. Upon receiving a new set of metrics, the old ones exposed will be overwritten. 
+Both the TCP and the Unix socket receiver endpoints expects the data to be in a key-value form. The capnp schema is also a basic kv structure where the key is the name of the application that is sending the metrics and the value, a string representation of metrics. If the format is chosen as json, it could be either a single multiline string representation of the entire metrics, or a json array of strings. This is just a way for the exporter proxy to distinguish between the metrices send by different application. Upon receiving a new set of metrics, the old ones exposed will be overwritten. 
 
 Eg: if at first, an application sends the following metrics
 
@@ -62,7 +62,7 @@ exporter-proxy/python_test_clients  🍣 master 🐍 v3.9.2 🐏 6GiB/8GiB | 102
 ## Test sending metrics
 
 These tests assume the default configuration as mentioned in the `config.toml`. If it is modified, change accordingly.
-A couple of json files and a python script is included in the [python_test_clients](./python_test_clients) directory.
+A couple of json files and a python script is included in the [stub](./stub) directory.
 `json_string.json` has the metric data as a single string whereas the `json_array.json` has the metric data as an array of strings. These are the two schemas that are supported. If the metrics isn't in any of these json format, it will not be deserialized and proxied.
 
 
@@ -72,14 +72,14 @@ run the exporter proxy as
 RUST_LOG="trace" cargo run
 ```
 
-and `cd python_test_clients` from another shell.
+and `cd stub` from another shell.
 
 To proxy the capnp serialized test metrics, first make sure that the `receiver.format` is `capnp` and not `json`. Restart the exporter proxy if it was already running.
 
 -  install the capnp library
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 - run the script `test_send_tcp_socket_capnp.py` and `curl localhost:6555/metrics` to see if it is exposing the metrics in prometheus exposition format. Run `curl localhost:6555/apps` to see the app names that sent the metrics.
@@ -102,7 +102,7 @@ or
 cat ./json_string.json | nc -s 127.0.0.1 127.0.0.1 6554 -q 0
 ```
 
-To test the external poll, cd to `python_test_clients` directory and run 
+To test the external poll, cd to `stub` directory and run 
 
 ```
 python3 -m http.server 1025&

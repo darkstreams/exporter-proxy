@@ -45,23 +45,32 @@ impl Args<'_> {
 pub struct Config {
     pub exporter: Exporter,
     pub receiver: Receiver,
-    pub poll_external: PollExternal,
+    pub poll_external: Option<PollExternal>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Receiver {
-    pub format: Format,
-    pub receive_on_unix_socket: bool,
-    pub receiver_unix_socket: String,
-    pub unix_socket_user: String,
-    pub unix_socket_group: String,
-    pub receive_on_tcp_socket: bool,
-    pub receiver_tcp_socket: SocketAddr,
+    pub capnp: Option<CapnP>,
+    pub json: Option<Json>,
+}
+#[derive(Debug, Deserialize)]
+pub struct CapnP {
+    pub receiver_unix_socket: Option<String>,
+    pub unix_socket_user: Option<String>,
+    pub unix_socket_group: Option<String>,
+    pub receiver_tcp_socket: Option<SocketAddr>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Json {
+    pub receiver_unix_socket: Option<String>,
+    pub unix_socket_user: Option<String>,
+    pub unix_socket_group: Option<String>,
+    pub receiver_tcp_socket: Option<SocketAddr>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PollExternal {
-    pub poll_other_scrape_endpoints: bool,
     pub other_scrape_endpoints: Vec<Url>,
     pub poll_interval: u64,
     pub client_timeout: u64,

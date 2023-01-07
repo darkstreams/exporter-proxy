@@ -1,5 +1,5 @@
 import capnp
-import src.schema.metric_data_capnp as metric_data_capnp
+import schema.metric_data_capnp as metric_data_capnp
 import socket
 import sys
 metrices = []

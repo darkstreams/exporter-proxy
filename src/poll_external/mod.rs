@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use parking_lot::RwLock;
-use tracing::error;
+use tracing::{error, info};
 use url::Url;
 
 use crate::inbound::GlobalMetrics;
 
 pub async fn poll_external(
     endpoints: Vec<Url>,
-    global_metrics: Arc<RwLock<GlobalMetrics>>,
+    global_metrics: Arc<GlobalMetrics>,
     poll_interval: u64,
     client_timeout: u64,
     accept_invalid_cert: bool,
@@ -26,6 +25,10 @@ pub async fn poll_external(
             )
         }
     };
+    info!(
+        "polling external endpoints {:?} every {} secs",
+        &endpoints, poll_interval
+    );
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(poll_interval)).await;
 
@@ -82,18 +85,13 @@ pub async fn poll_external(
                     continue;
                 }
             };
-            let data_string = match std::str::from_utf8(&data) {
-                Ok(ds) => ds,
-                Err(err) => {
-                    error!(
-                        "invalid utf_8 response body, discarding this request. Error: {}",
-                        err
-                    );
-                    continue;
-                }
-            };
-            let mut guard = global_metrics.write();
-            guard.insert(remote_addr.to_owned(), data_string.to_owned(), remote_addr);
+
+            global_metrics.polled_data.push(
+                &remote_addr.to_owned(),
+                data,
+                remote_addr.into_bytes(),
+                None,
+            )
         }
     }
 }

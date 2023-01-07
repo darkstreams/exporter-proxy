@@ -8,7 +8,6 @@ use capnp_futures;
 use exporter_proxy::schema::metric_data_capnp;
 use libc::{self, gid_t, uid_t};
 use nix::{errno::Errno, NixPath};
-use parking_lot::RwLock;
 use tokio::{
     io::{AsyncReadExt, BufStream},
     net::{TcpListener, UnixListener},
@@ -19,31 +18,34 @@ use tracing::{debug, error, info, trace};
 use users::{get_current_uid, get_group_by_name, get_user_by_name, get_user_by_uid};
 
 /// Create a unix socket from the socket path and chowns that socket to the socket user and group
-pub fn create_unix_listener(sock_path: &str, user: &str, group: &str) -> Result<UnixListener> {
-    let socket_path = Path::new(sock_path);
+pub fn create_unix_listener<T: AsRef<str>>(
+    sock_path: T,
+    user: Option<T>,
+    group: Option<T>,
+) -> Result<UnixListener> {
+    let socket_path = Path::new(sock_path.as_ref());
     let _ = std::fs::remove_file(socket_path);
     let user = match user {
-        "current_user" => get_user_by_uid(get_current_uid()).context("cannot find current user")?,
-        anything_else => {
-            get_user_by_name(anything_else).ok_or_else(|| anyhow!("user not found"))?
-        }
+        Some(usr) => get_user_by_name(usr.as_ref()).ok_or_else(|| anyhow!("user not found"))?,
+        None => get_user_by_uid(get_current_uid()).context("cannot find current user")?,
     };
     let group = match group {
-        "current_group" => {
+        Some(grp) => get_group_by_name(grp.as_ref()).ok_or_else(|| anyhow!("group not found"))?,
+        None => {
             let user = get_user_by_uid(get_current_uid()).context("cannot find current user")?;
             users::get_group_by_gid(user.primary_group_id())
                 .context("cannot find primary group of current user")?
         }
-        anything_else => {
-            get_group_by_name(anything_else).ok_or_else(|| anyhow!("group not found"))?
-        }
     };
-    let listener = UnixListener::bind(sock_path)?;
+    let listener = UnixListener::bind(sock_path.as_ref())?;
     let res = socket_path.with_nix_path(|cstr| unsafe {
         libc::chown(cstr.as_ptr(), user.uid() as uid_t, group.gid() as gid_t)
     })?;
     Errno::result(res)?;
-    info!("Starting to listen on unix socket at {:?}", sock_path);
+    info!(
+        "Starting to listen on unix socket at {:?}",
+        sock_path.as_ref()
+    );
     Ok(listener)
 }
 
@@ -58,7 +60,7 @@ pub async fn create_tcp_listener(addr: SocketAddr) -> Result<TcpListener> {
 /// handles requests from unix socket that are supposed to be in capnp format.
 pub async fn run_unix_listener_capnp(
     listener: UnixListener,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     sourceaddr: String,
     ratelimit: Arc<Semaphore>,
 ) {
@@ -92,7 +94,7 @@ pub async fn handle_client_capnp<
     T: std::marker::Unpin + FuturesAsyncReadCompatExt + std::fmt::Debug,
 >(
     mut stream: T,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     source: String,
 ) {
     loop {
@@ -136,19 +138,16 @@ pub async fn handle_client_capnp<
             }
         };
         // insert to global metrics
-        let mut guard = metrics.write();
-        guard.insert(
-            app_name.to_string(),
-            app_data.to_string(),
-            source.to_owned(),
-        );
-        drop(guard);
+        // let mut guard = metrics.write();
+        metrics
+            .capnp_data
+            .push(app_name, app_data.to_owned(), source.to_owned(), None);
     }
 }
 
 pub async fn run_unix_listener_json(
     listener: UnixListener,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     sourceaddr: String,
     ratelimit: Arc<Semaphore>,
 ) {
@@ -182,7 +181,7 @@ pub async fn handle_client_json<
     T: std::marker::Unpin + std::fmt::Debug + tokio::io::AsyncRead + tokio::io::AsyncWrite,
 >(
     mut stream: T,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     source: String,
 ) {
     loop {
@@ -207,9 +206,7 @@ pub async fn handle_client_json<
         match serde_json::from_slice::<HashMap<String, String>>(&data) {
             Ok(mapped) => {
                 if let Some((k, v)) = mapped.into_iter().next() {
-                    let mut guard = metrics.write();
-                    guard.insert(k, v, source);
-                    drop(guard);
+                    metrics.json_data.push(&k, v, source, None);
                     return;
                 }
             }
@@ -218,11 +215,9 @@ pub async fn handle_client_json<
                 match serde_json::from_slice::<HashMap<String, Vec<String>>>(&data) {
                     Ok(mapped) => {
                         if let Some((k, v)) = mapped.into_iter().next() {
-                            let mut guard = metrics.write();
                             let mut metric_joined = v.join("\n");
                             metric_joined.push('\n');
-                            guard.insert(k, metric_joined, source);
-                            drop(guard);
+                            metrics.json_data.push(&k, metric_joined, source, None);
                             return;
                         }
                     }
@@ -241,7 +236,7 @@ pub async fn handle_client_json<
 
 pub async fn run_tcp_listener_capnp(
     listener: TcpListener,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     sourceaddr: SocketAddr,
     ratelimit: Arc<Semaphore>,
 ) {
@@ -275,7 +270,7 @@ pub async fn run_tcp_listener_capnp(
 
 pub async fn run_tcp_listener_json(
     listener: TcpListener,
-    metrics: Arc<RwLock<GlobalMetrics>>,
+    metrics: Arc<GlobalMetrics>,
     sourceaddr: SocketAddr,
     ratelimit: Arc<Semaphore>,
 ) {

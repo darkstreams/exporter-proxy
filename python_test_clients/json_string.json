@@ -1,3 +1,0 @@
-{"foo_bar_app0_metrics":"# HELP http_requests_total_foo_bar_app0 The total number of HTTP requests.\n# TYPE http_requests_total_foo_bar_app0 counter\nhttp_requests_total_foo_bar_app0{method=\"post\",code=\"200\"} 1027 1395066363000\nhttp_requests_total_foo_bar_app0{method=\"post\",code=\"400\"}    3 1395066363000"
-
-}

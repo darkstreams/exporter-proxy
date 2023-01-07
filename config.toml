@@ -9,19 +9,29 @@ concurrent_requests = 2048
 # The endpoint where prometheus can scrape the collective metrics.
 scrape_expose_endpoint = "0.0.0.0:6555"
 [receiver]
-format = "json" # valid options: capnp or json
-# set to receive metrics on local unix socket
-receive_on_unix_socket = true
-# path to create and listen local unix socket
-receiver_unix_socket = "/var/run/exporter-proxy-receiver.sock"
+# Receive events in capn' proto. Comment to disable.
+[receiver.capnp]
+# listen for capnp events on unix socket. Comment to disable.
+receiver_unix_socket = "/var/run/exporter-proxy-receiver-capnp.sock"
 # unix socket user and group ownership
-unix_socket_user = "current_user"
-unix_socket_group = "current_group"
-# set to receive metrics on a TCP socket
-receive_on_tcp_socket = true
+unix_socket_user = "root"
+unix_socket_group = "root"
+
+# listen for capnp events on tcp socket. Comment to disable.
 receiver_tcp_socket = "127.0.0.1:6554"
+
+# Receive events in json format. Comment to disable.
+[receiver.json]
+# listen for json events on unix socket. Comment to disable.
+receiver_unix_socket = "/var/run/exporter-proxy-receiver-json.sock"
+# unix socket user and group ownership
+unix_socket_user = "root"
+unix_socket_group = "root"
+
+# listen for json events on tcp socket. Comment to disable.
+receiver_tcp_socket = "127.0.0.1:6553"
+
 [poll_external]
-poll_other_scrape_endpoints = false
 other_scrape_endpoints = ["http://127.0.0.1:1025/1025.html", "http://127.0.0.1:1026/1026.html", "http://127.0.0.1:1027/1027.html"]
 allow_invalid_certs = true
 poll_interval = 5 # in seconds
