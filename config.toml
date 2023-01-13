@@ -6,6 +6,8 @@ worker_threads = 0
 # This limit is not applied for poll_external, as it is rare to hit a threshold limit and the limit can be controlled
 # by restricting the number of endpoints in `other_scrape_endpoints` under the poll_external section.
 concurrent_requests = 2048
+stale_check_interval = 1
+stale_metric_ttl = 10
 # The endpoint where prometheus can scrape the collective metrics.
 scrape_expose_endpoint = "0.0.0.0:6555"
 [receiver]
